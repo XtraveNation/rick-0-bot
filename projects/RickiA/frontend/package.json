@@ -1,0 +1,19 @@
+{
+  "name": "rickai-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "parcel index.html --port 3000",
+    "build": "parcel build index.html --public-url ./"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mui/material": "^5.15.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0"
+  },
+  "devDependencies": {
+    "parcel": "^2.9.3"
+  }
+}
