@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - db-data:/app/data
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-rick_sanchez_secret_jwt_key_2024}
+      - PORT=5000
+      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - TOKEN_FAUCET=${TOKEN_FAUCET:-1000}
+    restart: unless-stopped
+
+volumes:
+  db-data:
