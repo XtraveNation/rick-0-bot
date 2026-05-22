@@ -28,6 +28,20 @@ const qdrant = new QdrantService();
 // Mount Stripe handler (placeholder)
 app.use('/api/stripe', stripeHandler);
 
+// SUMMER: Document indexing endpoint (scans repo and indexes into Qdrant)
+const documentIndexer = require('./summer/documentIndexer');
+
+app.post('/api/summer/index', authenticate, async (req, res) => {
+  try {
+    const { paths } = req.body || {};
+    const summary = await documentIndexer.indexPaths(paths);
+    res.json({ success: true, summary });
+  } catch (err) {
+    console.error('Document indexer error:', err);
+    res.status(500).json({ error: 'Indexing failed' });
+  }
+});
+
 const morty = require('./morty');
 
 // Placeholder authentication middleware
