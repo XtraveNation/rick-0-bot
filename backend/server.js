@@ -12,6 +12,8 @@ const { getDatabase } = require('./jerry/db');
 const { extractEntities, formatExtractedEntities } = require('./jerry/entityExtractor');
 const QdrantService = require('./qdrant-service');
 const stripeHandler = require('./stripe/checkoutHandler');
+const { PaymentManager, CoinbaseCommerceProvider, StripeProvider } = require('./payments/paymentManager');
+const paymentHandler = require('./payments/paymentHandler');
 
 // Initialize app
 const app = express();
@@ -25,8 +27,15 @@ app.use(express.json({ limit: '10mb' }));
 const db = getDatabase();
 const qdrant = new QdrantService();
 
-// Mount Stripe handler (placeholder)
+// Initialize payment manager
+const paymentMgr = new PaymentManager();
+paymentMgr.register('coinbase', new CoinbaseCommerceProvider(process.env.COINBASE_API_KEY));
+paymentMgr.register('stripe', new StripeProvider(process.env.STRIPE_SECRET_KEY));
+paymentHandler.setPaymentManager(paymentMgr);
+
+// Mount handlers
 app.use('/api/stripe', stripeHandler);
+app.use('/api/payments', paymentHandler.router);
 
 // SUMMER: Document indexing endpoint (scans repo and indexes into Qdrant)
 const documentIndexer = require('./summer/documentIndexer');
@@ -257,10 +266,17 @@ app.post('/api/morty/execute', authenticate, async (req, res) => {
 // TOKENS ENDPOINTS
 // ============================================================================
 
-const tokensService = require('./jerry/tokens');
+const { PaymentManager, CoinbaseCommerceProvider, StripeProvider } = require('./payments/paymentManager');
+const paymentHandler = require('./payments/paymentHandler');
 
-// Ensure tokens table exists on startup
-tokensService.ensureTokensTable().catch(err => console.warn('Tokens table init failed:', err));
+// Initialize payment manager
+const paymentMgr = new PaymentManager();
+paymentMgr.register('coinbase', new CoinbaseCommerceProvider(process.env.COINBASE_API_KEY));
+paymentMgr.register('stripe', new StripeProvider(process.env.STRIPE_SECRET_KEY));
+paymentHandler.setPaymentManager(paymentMgr);
+
+// Mount payment handler
+app.use('/api/payments', paymentHandler.router);
 
 // GET balance
 app.get('/api/tokens/balance', authenticate, async (req, res) => {
