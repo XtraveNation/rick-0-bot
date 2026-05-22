@@ -235,6 +235,55 @@ app.post('/api/morty/execute', authenticate, async (req, res) => {
 });
 
 // ============================================================================
+// TOKENS ENDPOINTS
+// ============================================================================
+
+const tokensService = require('./jerry/tokens');
+
+// Ensure tokens table exists on startup
+tokensService.ensureTokensTable().catch(err => console.warn('Tokens table init failed:', err));
+
+// GET balance
+app.get('/api/tokens/balance', authenticate, async (req, res) => {
+  const { session_id } = req.query;
+  if (!session_id) return res.status(400).json({ error: 'Missing session_id' });
+  try {
+    const balance = await tokensService.getBalance(session_id);
+    res.json({ session_id, balance });
+  } catch (err) {
+    console.error('Error getting token balance:', err);
+    res.status(500).json({ error: 'Failed to get balance' });
+  }
+});
+
+// POST consume tokens
+app.post('/api/tokens/consume', authenticate, async (req, res) => {
+  const { session_id, amount } = req.body;
+  if (!session_id || !amount) return res.status(400).json({ error: 'Missing session_id or amount' });
+  try {
+    const result = await tokensService.consumeTokens(session_id, parseInt(amount, 10));
+    if (!result.success) return res.status(402).json({ success: false, balance: result.balance, message: result.message });
+    res.json({ success: true, balance: result.balance });
+  } catch (err) {
+    console.error('Error consuming tokens:', err);
+    res.status(500).json({ error: 'Failed to consume tokens' });
+  }
+});
+
+// POST add tokens (admin or webhook)
+app.post('/api/tokens/add', authenticate, async (req, res) => {
+  const { session_id, amount } = req.body;
+  if (!session_id || !amount) return res.status(400).json({ error: 'Missing session_id or amount' });
+  try {
+    const balance = await tokensService.addTokens(session_id, parseInt(amount, 10));
+    res.json({ success: true, balance });
+  } catch (err) {
+    console.error('Error adding tokens:', err);
+    res.status(500).json({ error: 'Failed to add tokens' });
+  }
+});
+
+// ============================================================================
 // HEALTH CHECK
 // ============================================================================
 
