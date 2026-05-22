@@ -11,6 +11,7 @@ dotenv.config({ path: path.join(__dirname, 'gateway', '.env') });
 const { getDatabase } = require('./jerry/db');
 const { extractEntities, formatExtractedEntities } = require('./jerry/entityExtractor');
 const QdrantService = require('./qdrant-service');
+const stripeHandler = require('./stripe/checkoutHandler');
 
 // Initialize app
 const app = express();
@@ -23,6 +24,10 @@ app.use(express.json({ limit: '10mb' }));
 // Initialize services
 const db = getDatabase();
 const qdrant = new QdrantService();
+
+// Mount Stripe handler (placeholder)
+app.use('/api/stripe', stripeHandler);
+
 const morty = require('./morty');
 
 // Placeholder authentication middleware
