@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, TextField, Box, Typography, Paper } from '@mui/material';
 import TokenBudget from './components/TokenBudget';
+import MortyTasks from './components/MortyTasks';
 import useTokens from './hooks/useTokens';
 import { styled } from '@mui/material/styles';
 
@@ -76,6 +77,8 @@ function RickTab() {
       </Typography>
 
       <TokenBudget balance={balance} loading={loading} />
+
+      <MortyTasks sessionId={sessionId} onResult={(m) => setMessages(prev => [...prev, m])} />
 
       <Box sx={{ display: 'flex', flexDirection: 'column', height: 450, gap: 2 }}>
         <Box sx={{ flex: 1, overflowY: 'auto', p: 2, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 2 }}>
