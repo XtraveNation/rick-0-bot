@@ -14,32 +14,46 @@ const JerryTheme = styled(Paper)(({ theme }) => ({
 function JerryTab() {
   const [tokenBudget, setTokenBudget] = useState(100000);
   const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const connectWallet = async () => {
     if (window.ethereum) {
       try {
         await window.ethereum.request({ method: 'eth_requestAccounts' });
         setConnected(true);
-      } catch (error) {
-        console.error('Wallet connection error:', error);
+        setError('');
+      } catch (err) {
+        console.error('Wallet connection error:', err);
+        setError('Failed to connect wallet');
       }
     } else {
-      alert('Please install MetaMask!');
+      setError('MetaMask not installed');
     }
   };
 
   const handleBuyTokens = async () => {
+    setLoading(true);
+    setError('');
     try {
       const response = await fetch('/api/buy-tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: '1' }),
       });
+      if (!response.ok) throw new Error(`Server error ${response.status}`);
       const data = await response.json();
-      if (data.success) alert(`Purchased ${data.tokensBought} tokens!`);
-      else alert(data.error || 'Purchase failed');
+      if (data.success) {
+        alert(`Purchased ${data.tokensBought} tokens!`);
+        setTokenBudget(prev => prev + data.tokensBought);
+      } else {
+        throw new Error(data.error || 'Purchase failed');
+      }
     } catch (e) {
-      alert('Failed to purchase tokens');
+      console.error(e);
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,11 +64,12 @@ function JerryTab() {
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="body1" color="primary">Token Budget: {tokenBudget.toLocaleString()}</Typography>
+        {error && <Typography variant="body2" color="error">{error}</Typography>}
         <Button variant="contained" color="primary" onClick={connectWallet} disabled={connected}>
           {connected ? 'Wallet Connected' : 'Connect Wallet'}
         </Button>
-        <Button variant="contained" color="success" sx={{ mt: 1 }}>
-          Buy Tokens
+        <Button variant="contained" color="success" sx={{ mt: 1 }} onClick={handleBuyTokens} disabled={loading}>
+          {loading ? 'Purchasing...' : 'Buy Tokens'}
         </Button>
         <Typography variant="body2" sx={{ mt: 2 }}>
           Token efficiency layers (semantic cache, model cascading) are enabled.

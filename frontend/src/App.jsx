@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Switch, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import RickTab from './RickTab';
 import MortyTab from './MortyTab';
 import SummerTab from './SummerTab';
@@ -17,12 +17,12 @@ function App() {
             <li><Link to="/jerry">Jerry</Link></li>
           </ul>
         </nav>
-        <Switch>
-          <Route path="/"><RickTab /></Route>
-          <Route path="/morty"><MortyTab /></Route>
-          <Route path="/summer"><SummerTab /></Route>
-          <Route path="/jerry"><JerryTab /></Route>
-        </Switch>
+        <Routes>
+          <Route path="/" element={<RickTab />} />
+          <Route path="/morty" element={<MortyTab />} />
+          <Route path="/summer" element={<SummerTab />} />
+          <Route path="/jerry" element={<JerryTab />} />
+        </Routes>
       </div>
     </Router>
   );
