@@ -41,8 +41,6 @@ paymentHandler.setPaymentManager(paymentMgr);
 app.use('/api/stripe', stripeHandler);
 app.use('/api/payments', paymentHandler.router);
 app.use('/api/summer', summerRouter);
-  }
-});
 
 const morty = require('./morty');
 
