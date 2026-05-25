@@ -10,10 +10,11 @@ dotenv.config({ path: path.join(__dirname, 'gateway', '.env') });
 // Import services
 const { getDatabase } = require('./jerry/db');
 const { extractEntities, formatExtractedEntities } = require('./jerry/entityExtractor');
-const QdrantService = require('./qdrant-service');
+const QdrantClient = require('./summer/qdrantClient');
 const stripeHandler = require('./stripe/checkoutHandler');
 const { PaymentManager, CoinbaseCommerceProvider, StripeProvider } = require('./payments/paymentManager');
 const paymentHandler = require('./payments/paymentHandler');
+const summerRouter = require('./summer/endpoints');
 
 // Initialize app
 const app = express();
@@ -25,7 +26,10 @@ app.use(express.json({ limit: '10mb' }));
 
 // Initialize services
 const db = getDatabase();
-const qdrant = new QdrantService();
+const qdrant = new QdrantClient(
+  process.env.QDRANT_URL || 'http://localhost:6333',
+  process.env.EMBEDDING_PROVIDER || 'openai'
+);
 
 // Initialize payment manager
 const paymentMgr = new PaymentManager();
@@ -36,18 +40,7 @@ paymentHandler.setPaymentManager(paymentMgr);
 // Mount handlers
 app.use('/api/stripe', stripeHandler);
 app.use('/api/payments', paymentHandler.router);
-
-// SUMMER: Document indexing endpoint (scans repo and indexes into Qdrant)
-const documentIndexer = require('./summer/documentIndexer');
-
-app.post('/api/summer/index', authenticate, async (req, res) => {
-  try {
-    const { paths } = req.body || {};
-    const summary = await documentIndexer.indexPaths(paths);
-    res.json({ success: true, summary });
-  } catch (err) {
-    console.error('Document indexer error:', err);
-    res.status(500).json({ error: 'Indexing failed' });
+app.use('/api/summer', summerRouter);
   }
 });
 

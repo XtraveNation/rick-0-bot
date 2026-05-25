@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 
-const Qdrant = require('../qdrant-service');
-
 async function readFileSafe(filePath) {
   try {
     const stats = fs.statSync(filePath);
@@ -20,22 +18,26 @@ function walk(dir, exts = ['.md', '.txt', '.html', '.js', '.jsx', '.py']) {
   const list = fs.readdirSync(dir);
   list.forEach(file => {
     const p = path.join(dir, file);
-    const stat = fs.statSync(p);
-    if (stat && stat.isDirectory()) {
-      results.push(...walk(p, exts));
-    } else {
-      if (exts.includes(path.extname(p))) results.push(p);
+    try {
+      const stat = fs.statSync(p);
+      if (stat && stat.isDirectory()) {
+        results.push(...walk(p, exts));
+      } else {
+        if (exts.includes(path.extname(p))) results.push(p);
+      }
+    } catch (e) {
+      // Skip files that can't be read
     }
   });
   return results;
 }
 
-async function indexPaths(paths = []) {
+async function indexPaths(paths = [], qdrantClient) {
   // default paths to index
   const repoRoot = path.resolve(__dirname, '..', '..');
   const toIndex = new Set();
   if (!paths || paths.length === 0) {
-    ['README.md', 'frontend', 'backend', 'Projects', 'Docs'].forEach(p => {
+    ['README.md', 'frontend', 'backend', 'Projects'].forEach(p => {
       const full = path.join(repoRoot, p);
       if (fs.existsSync(full)) toIndex.add(full);
     });
@@ -61,15 +63,15 @@ async function indexPaths(paths = []) {
     const content = await readFileSafe(f);
     if (!content) { summary.errors++; continue; }
     try {
-      await Qdrant.upsertVector(content.substring(0, 20000), { path: f });
+      await qdrantClient.upsertDocument(f, content.substring(0, 20000), { path: f });
       summary.indexed++;
     } catch (e) {
-      console.error('Failed to index', f, e);
+      console.error('Failed to index', f, e.message);
       summary.errors++;
     }
   }
 
-  return summary;
+  return `Indexed ${summary.indexed} documents, ${summary.errors} errors`;
 }
 
 module.exports = { indexPaths };

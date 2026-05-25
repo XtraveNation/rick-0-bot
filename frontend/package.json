@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "start": "parcel index.html --port 3000",
+    "dev": "parcel index.html --port 3000",
     "build": "parcel build index.html --public-url ./",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
@@ -16,6 +19,7 @@
     "react-router-dom": "^6.16.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.40.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "eslint": "^8.52.0",
