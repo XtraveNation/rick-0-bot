@@ -1,5 +1,6 @@
 // Real Qdrant HTTP client with embedding support
 const axios = require('axios');
+const logger = require('../logger');
 
 class QdrantClient {
   constructor(qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333', embeddingProvider = 'openai') {
@@ -34,7 +35,7 @@ class QdrantClient {
       );
       return response.data.data[0].embedding;
     } catch (err) {
-      console.error('OpenAI embedding error:', err.message);
+      logger.error('OpenAI embedding error:', err.message);
       throw err;
     }
   }
@@ -57,7 +58,7 @@ class QdrantClient {
       );
       return response.data.embeddings[0];
     } catch (err) {
-      console.error('Cohere embedding error:', err.message);
+      logger.error('Cohere embedding error:', err.message);
       throw err;
     }
   }

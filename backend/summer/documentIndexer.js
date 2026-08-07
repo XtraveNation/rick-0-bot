@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('../logger');
 
 async function readFileSafe(filePath) {
   try {
@@ -66,7 +67,7 @@ async function indexPaths(paths = [], qdrantClient) {
       await qdrantClient.upsertDocument(f, content.substring(0, 20000), { path: f });
       summary.indexed++;
     } catch (e) {
-      console.error('Failed to index', f, e.message);
+      logger.error('Failed to index', f, e.message);
       summary.errors++;
     }
   }

@@ -1,4 +1,5 @@
 const { promisify } = require('util');
+const logger = require('../logger');
 
 class MortyExecutor {
   constructor(registry, db, options = {}) {
@@ -18,9 +19,9 @@ class MortyExecutor {
     // Enforce timeout
     const t = timeoutMs || this.timeoutMs;
     const agentPromise = (async () => {
-      console.log(`Morty: executing agent ${agentName} for session ${sessionId}`);
+      logger.info(`Morty: executing agent ${agentName} for session ${sessionId}`);
       const out = await agent.execute({ input, sessionId, db: this.db });
-      console.log(`Morty: agent ${agentName} completed for session ${sessionId}`);
+      logger.info(`Morty: agent ${agentName} completed for session ${sessionId}`);
       return out;
     })();
 
@@ -32,7 +33,7 @@ class MortyExecutor {
     try {
       result = await Promise.race([agentPromise, timeoutPromise]);
     } catch (err) {
-      console.error('Morty execution error:', err.message || err);
+      logger.error('Morty execution error:', err.message || err);
       throw err;
     }
 
@@ -45,7 +46,7 @@ class MortyExecutor {
       const outVal = (typeof result === 'object') ? JSON.stringify(result).substring(0, 200) : String(result);
       await this.db.upsertEntity(sessionId, 'morty_output', outVal);
     } catch (err) {
-      console.error('Morty persistence error:', err.message || err);
+      logger.error('Morty persistence error:', err.message || err);
     }
 
     return result;

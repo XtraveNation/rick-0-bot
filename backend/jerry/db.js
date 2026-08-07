@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const logger = require('../logger');
 
 class JerryDatabase {
   constructor() {
@@ -14,9 +15,9 @@ class JerryDatabase {
 
     this.db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
-        console.error('Failed to connect to Jerry database:', err);
+        logger.error('Failed to connect to Jerry database:', err);
       } else {
-        console.log('Connected to Jerry SQLite database at:', dbPath);
+        logger.info('Connected to Jerry SQLite database at:', dbPath);
       }
     });
 
@@ -236,7 +237,7 @@ class JerryDatabase {
         if (err) {
           reject(err);
         } else {
-          console.log('Jerry database connection closed');
+          logger.info('Jerry database connection closed');
           resolve();
         }
       });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const QdrantClient = require('./qdrantClient');
 const documentIndexer = require('./documentIndexer');
+const logger = require('../logger');
 
 const qdrant = new QdrantClient(
   process.env.QDRANT_URL || 'http://localhost:6333',
@@ -15,7 +16,7 @@ router.post('/index', async (req, res) => {
     const summary = await documentIndexer.indexPaths(paths, qdrant);
     res.json({ success: true, summary });
   } catch (err) {
-    console.error('Indexing error:', err);
+    logger.error('Indexing error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -29,7 +30,7 @@ router.get('/search', async (req, res) => {
     const results = await qdrant.search(q, parseInt(limit) || 5);
     res.json({ success: true, results });
   } catch (err) {
-    console.error('Search error:', err);
+    logger.error('Search error:', err);
     res.status(500).json({ error: err.message });
   }
 });

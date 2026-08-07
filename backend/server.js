@@ -4,8 +4,12 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Load environment variables
-dotenv.config({ path: path.join(__dirname, 'gateway', '.env') });
+// Load environment variables from backend/.env (see backend/.env.example
+// and DEPLOYMENT.md for the documented variable set).
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const logger = require('./logger');
+const { webhookLimiter, apiLimiter } = require('./rateLimiters');
 
 // Import services
 const { getDatabase } = require('./jerry/db');
@@ -36,6 +40,17 @@ const paymentMgr = new PaymentManager();
 paymentMgr.register('coinbase', new CoinbaseCommerceProvider(process.env.COINBASE_API_KEY));
 paymentMgr.register('stripe', new StripeProvider(process.env.STRIPE_SECRET_KEY));
 paymentHandler.setPaymentManager(paymentMgr);
+
+// Rate limiting: stricter limiter on payment webhook routes, general limiter
+// on public API routes. Applied before routes are mounted/defined below.
+app.use('/api/payments/webhook/coinbase', webhookLimiter);
+app.use('/api/payments/webhook/stripe', webhookLimiter);
+app.use('/api/payments/create-checkout', apiLimiter);
+app.use('/api/jerry', apiLimiter);
+app.use('/api/search', apiLimiter);
+app.use('/api/upload', apiLimiter);
+app.use('/api/morty/execute', apiLimiter);
+app.use('/api/tokens', apiLimiter);
 
 // Mount handlers
 app.use('/api/stripe', stripeHandler);
@@ -106,7 +121,7 @@ app.post('/api/jerry/store', authenticate, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Error storing message:', error);
+    logger.error('Error storing message:', error);
     res.status(500).json({ error: 'Failed to store message' });
   }
 });
@@ -142,7 +157,7 @@ app.get('/api/jerry/history', authenticate, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Error retrieving history:', error);
+    logger.error('Error retrieving history:', error);
     res.status(500).json({ error: 'Failed to retrieve history' });
   }
 });
@@ -183,7 +198,7 @@ app.get('/api/jerry/entities', authenticate, async (req, res) => {
       entities: groupedEntities
     });
   } catch (error) {
-    console.error('Error retrieving entities:', error);
+    logger.error('Error retrieving entities:', error);
     res.status(500).json({ error: 'Failed to retrieve entities' });
   }
 });
@@ -200,7 +215,7 @@ app.post('/api/search', authenticate, async (req, res) => {
     const results = await qdrant.searchVectors(query, 5);
     res.json({ results });
   } catch (error) {
-    console.error('Search error:', error);
+    logger.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });
   }
 });
@@ -213,7 +228,7 @@ app.post('/api/upload', authenticate, async (req, res) => {
     await qdrant.upsertVector(text, metadata);
     res.json({ success: true, message: 'Document added to knowledge base' });
   } catch (error) {
-    console.error('Upload error:', error);
+    logger.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to add document' });
   }
 });
@@ -228,7 +243,7 @@ app.get('/api/morty/agents', authenticate, async (req, res) => {
     const agents = morty.listAgents();
     res.json({ agents });
   } catch (err) {
-    console.error('Morty list agents error:', err);
+    logger.error('Morty list agents error:', err);
     res.status(500).json({ error: 'Failed to list agents' });
   }
 });
@@ -242,7 +257,7 @@ app.post('/api/morty/execute', authenticate, async (req, res) => {
     const output = await morty.execute(session_id, agent, input || {}, timeout_ms);
     res.json({ success: true, output });
   } catch (err) {
-    console.error('Morty execute error:', err);
+    logger.error('Morty execute error:', err);
     if (err.message && err.message.includes('timed out')) {
       res.status(504).json({ error: 'Agent execution timed out' });
     } else if (err.message && err.message.includes('not found')) {
@@ -257,18 +272,6 @@ app.post('/api/morty/execute', authenticate, async (req, res) => {
 // TOKENS ENDPOINTS
 // ============================================================================
 
-const { PaymentManager, CoinbaseCommerceProvider, StripeProvider } = require('./payments/paymentManager');
-const paymentHandler = require('./payments/paymentHandler');
-
-// Initialize payment manager
-const paymentMgr = new PaymentManager();
-paymentMgr.register('coinbase', new CoinbaseCommerceProvider(process.env.COINBASE_API_KEY));
-paymentMgr.register('stripe', new StripeProvider(process.env.STRIPE_SECRET_KEY));
-paymentHandler.setPaymentManager(paymentMgr);
-
-// Mount payment handler
-app.use('/api/payments', paymentHandler.router);
-
 // GET balance
 app.get('/api/tokens/balance', authenticate, async (req, res) => {
   const { session_id } = req.query;
@@ -277,7 +280,7 @@ app.get('/api/tokens/balance', authenticate, async (req, res) => {
     const balance = await tokensService.getBalance(session_id);
     res.json({ session_id, balance });
   } catch (err) {
-    console.error('Error getting token balance:', err);
+    logger.error('Error getting token balance:', err);
     res.status(500).json({ error: 'Failed to get balance' });
   }
 });
@@ -291,7 +294,7 @@ app.post('/api/tokens/consume', authenticate, async (req, res) => {
     if (!result.success) return res.status(402).json({ success: false, balance: result.balance, message: result.message });
     res.json({ success: true, balance: result.balance });
   } catch (err) {
-    console.error('Error consuming tokens:', err);
+    logger.error('Error consuming tokens:', err);
     res.status(500).json({ error: 'Failed to consume tokens' });
   }
 });
@@ -304,7 +307,7 @@ app.post('/api/tokens/add', authenticate, async (req, res) => {
     const balance = await tokensService.addTokens(session_id, parseInt(amount, 10));
     res.json({ success: true, balance });
   } catch (err) {
-    console.error('Error adding tokens:', err);
+    logger.error('Error adding tokens:', err);
     res.status(500).json({ error: 'Failed to add tokens' });
   }
 });
@@ -322,7 +325,7 @@ app.get('/api/health', (req, res) => {
 // ============================================================================
 
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error:', err);
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
@@ -336,37 +339,37 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     // Initialize Jerry database
-    console.log('Initializing Jerry database...');
+    logger.info('Initializing Jerry database...');
     await db.init();
-    console.log('Jerry database initialized');
+    logger.info('Jerry database initialized');
 
     // Initialize Morty agent framework
     try {
       await morty.init(db);
-      console.log('Morty agent framework initialized');
+      logger.info('Morty agent framework initialized');
     } catch (err) {
-      console.error('Failed to initialize Morty:', err);
+      logger.error('Failed to initialize Morty:', err);
     }
 
     // Start server
     app.listen(PORT, () => {
-      console.log(`✓ RickiA Backend running on port ${PORT}`);
-      console.log(`✓ Jerry persistence layer ready`);
+      logger.info(`✓ RickiA Backend running on port ${PORT}`);
+      logger.info(`✓ Jerry persistence layer ready`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+  logger.info('SIGTERM signal received: closing HTTP server');
   try {
     await db.close();
     process.exit(0);
   } catch (error) {
-    console.error('Error during shutdown:', error);
+    logger.error('Error during shutdown:', error);
     process.exit(1);
   }
 });
