@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'node',
-  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/tests/setup.js', '/tests/helpers/'],
   collectCoverageFrom: [
     'jerry/**/*.js',
     '!jerry/**/*.test.js',

@@ -1,20 +1,32 @@
 const request = require('supertest');
 const path = require('path');
 const fs = require('fs');
+const util = require('util');
 const { app } = require('../../../server');
 const { getDatabase } = require('../../../jerry/db');
+
+// getDatabase() caches a singleton for the lifetime of this process, so both
+// describe blocks below (which both call getDatabase()) end up sharing the
+// same underlying db connection/file - whichever path is set the first time
+// it's constructed. Track that single path here so it can be cleaned up
+// once, after both describes have finished with it.
+let sharedTestDbPath;
 
 describe('GET /api/jerry/history', () => {
   let db;
   const testSessionId = 'history-test-session';
 
   beforeAll(async () => {
-    db = getDatabase();
     const testDir = path.join(__dirname, '..', '..', '..', 'data', 'test');
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
-    process.env.JERRY_DB_PATH = path.join(testDir, `history-test-${Date.now()}.db`);
+    // Set JERRY_DB_PATH before the singleton is first constructed so this
+    // file's data lands in an isolated test db rather than the default
+    // backend/data/jerry.db.
+    sharedTestDbPath = path.join(testDir, `history-test-${Date.now()}.db`);
+    process.env.JERRY_DB_PATH = sharedTestDbPath;
+    db = getDatabase();
   });
 
   beforeEach(async () => {
@@ -23,6 +35,14 @@ describe('GET /api/jerry/history', () => {
     } catch (err) {
       // Schema might already exist
     }
+
+    // storeMessage() always inserts a new row (unique id per call), so
+    // without clearing previous rows first, messages would accumulate
+    // across every `it` in this describe block (they all reuse the same
+    // testSessionId), breaking assertions like total_messages === 4.
+    await util.promisify(db.db.run.bind(db.db))(
+      'DELETE FROM messages WHERE session_id = ?', [testSessionId]
+    );
 
     // Store test messages
     await db.storeMessage(testSessionId, 'user', 'First message', 10);
@@ -34,13 +54,11 @@ describe('GET /api/jerry/history', () => {
     await db.storeMessage(testSessionId, 'assistant', 'Second response', 25);
   });
 
-  afterAll(async () => {
-    try {
-      await db.close();
-    } catch (err) {
-      // Already closed
-    }
-  });
+  // Note: db is intentionally NOT closed here. It's the shared getDatabase()
+  // singleton, still needed by the 'GET /api/jerry/entities' describe block
+  // below (and by the app's own request handlers) within this same test
+  // file/worker. It's closed once, in that block's afterAll, after all
+  // tests in this file have run.
 
   it('should retrieve message history for a session', async () => {
     const response = await request(app)
@@ -215,6 +233,9 @@ describe('GET /api/jerry/entities', () => {
       await db.close();
     } catch (err) {
       // Already closed
+    }
+    if (sharedTestDbPath && fs.existsSync(sharedTestDbPath)) {
+      fs.unlinkSync(sharedTestDbPath);
     }
   });
 

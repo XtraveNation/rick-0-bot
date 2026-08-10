@@ -102,6 +102,12 @@ class JerryDatabase {
         this.db.run(`
           CREATE INDEX IF NOT EXISTS idx_summaries_session_id ON summaries(session_id)
         `, (err) => {
+          if (err) reject(err);
+        });
+
+        this.db.run(`
+          CREATE INDEX IF NOT EXISTS idx_summaries_created_at ON summaries(created_at)
+        `, (err) => {
           if (err) {
             reject(err);
           } else {
@@ -139,11 +145,15 @@ class JerryDatabase {
    */
   getHistory(sessionId, limit = 50) {
     return new Promise((resolve, reject) => {
+      // Order by rowid (SQLite's implicit, monotonically increasing insert
+      // order) rather than created_at: CURRENT_TIMESTAMP only has 1-second
+      // resolution, so messages inserted within the same second would sort
+      // arbitrarily/non-deterministically if ordered by created_at alone.
       const stmt = this.db.prepare(`
         SELECT id, session_id, role, content, tokens_used, created_at
         FROM messages
         WHERE session_id = ?
-        ORDER BY created_at DESC
+        ORDER BY rowid DESC
         LIMIT ?
       `);
 

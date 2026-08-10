@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const util = require('util');
 const { JerryDatabase } = require('../../../jerry/db');
 
 describe('Jerry Database Initialization', () => {
@@ -26,123 +27,93 @@ describe('Jerry Database Initialization', () => {
     }
   });
 
+  // Promisified helper so assertion failures inside the sqlite3 callback
+  // reject the returned promise instead of throwing across the N-API
+  // callback boundary (which crashes the whole Jest worker process).
+  function dbAll(sql) {
+    return util.promisify(db.db.all).bind(db.db)(sql);
+  }
+
   describe('Schema Creation', () => {
     it('should create messages table', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`
-          SELECT name FROM sqlite_master 
-          WHERE type='table' AND name='messages'
-        `, (err, rows) => {
-          if (err) reject(err);
-          expect(rows.length).toBe(1);
-          expect(rows[0].name).toBe('messages');
-          resolve();
-        });
-      });
+      const rows = await dbAll(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='messages'
+      `);
+      expect(rows.length).toBe(1);
+      expect(rows[0].name).toBe('messages');
     });
 
     it('should create entities table', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`
-          SELECT name FROM sqlite_master 
-          WHERE type='table' AND name='entities'
-        `, (err, rows) => {
-          if (err) reject(err);
-          expect(rows.length).toBe(1);
-          expect(rows[0].name).toBe('entities');
-          resolve();
-        });
-      });
+      const rows = await dbAll(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='entities'
+      `);
+      expect(rows.length).toBe(1);
+      expect(rows[0].name).toBe('entities');
     });
 
     it('should create summaries table', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`
-          SELECT name FROM sqlite_master 
-          WHERE type='table' AND name='summaries'
-        `, (err, rows) => {
-          if (err) reject(err);
-          expect(rows.length).toBe(1);
-          expect(rows[0].name).toBe('summaries');
-          resolve();
-        });
-      });
+      const rows = await dbAll(`
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name='summaries'
+      `);
+      expect(rows.length).toBe(1);
+      expect(rows[0].name).toBe('summaries');
     });
 
     it('should create indexes for performance', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`
-          SELECT name FROM sqlite_master 
-          WHERE type='index' AND name LIKE 'idx_%'
-        `, (err, rows) => {
-          if (err) reject(err);
-          expect(rows.length).toBeGreaterThanOrEqual(6); // 2 for messages, 2 for entities, 1 for summaries, 1 for summaries
-          resolve();
-        });
-      });
+      const rows = await dbAll(`
+        SELECT name FROM sqlite_master
+        WHERE type='index' AND name LIKE 'idx_%'
+      `);
+      // 2 for messages, 2 for entities, 2 for summaries
+      expect(rows.length).toBeGreaterThanOrEqual(6);
     });
 
     it('should have correct columns in messages table', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`PRAGMA table_info(messages)`, (err, rows) => {
-          if (err) reject(err);
-          
-          const columns = rows.map(r => r.name);
-          expect(columns).toContain('id');
-          expect(columns).toContain('session_id');
-          expect(columns).toContain('role');
-          expect(columns).toContain('content');
-          expect(columns).toContain('tokens_used');
-          expect(columns).toContain('created_at');
-          resolve();
-        });
-      });
+      const rows = await dbAll(`PRAGMA table_info(messages)`);
+      const columns = rows.map(r => r.name);
+      expect(columns).toContain('id');
+      expect(columns).toContain('session_id');
+      expect(columns).toContain('role');
+      expect(columns).toContain('content');
+      expect(columns).toContain('tokens_used');
+      expect(columns).toContain('created_at');
     });
 
     it('should have correct columns in entities table', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`PRAGMA table_info(entities)`, (err, rows) => {
-          if (err) reject(err);
-          
-          const columns = rows.map(r => r.name);
-          expect(columns).toContain('id');
-          expect(columns).toContain('session_id');
-          expect(columns).toContain('entity_type');
-          expect(columns).toContain('value');
-          expect(columns).toContain('last_seen');
-          resolve();
-        });
-      });
+      const rows = await dbAll(`PRAGMA table_info(entities)`);
+      const columns = rows.map(r => r.name);
+      expect(columns).toContain('id');
+      expect(columns).toContain('session_id');
+      expect(columns).toContain('entity_type');
+      expect(columns).toContain('value');
+      expect(columns).toContain('last_seen');
     });
 
     it('should have correct columns in summaries table', async () => {
       await db.init();
 
-      return new Promise((resolve, reject) => {
-        db.db.all(`PRAGMA table_info(summaries)`, (err, rows) => {
-          if (err) reject(err);
-          
-          const columns = rows.map(r => r.name);
-          expect(columns).toContain('id');
-          expect(columns).toContain('session_id');
-          expect(columns).toContain('turn_range');
-          expect(columns).toContain('summary_text');
-          expect(columns).toContain('created_at');
-          resolve();
-        });
-      });
+      const rows = await dbAll(`PRAGMA table_info(summaries)`);
+      const columns = rows.map(r => r.name);
+      expect(columns).toContain('id');
+      expect(columns).toContain('session_id');
+      expect(columns).toContain('turn_range');
+      expect(columns).toContain('summary_text');
+      expect(columns).toContain('created_at');
     });
 
     it('should enforce role check constraint', async () => {

@@ -10,3 +10,7 @@ build/
 dist/
 .cache/
 coverage/
+
+# SQLite runtime/test databases (backend/jerry/db.js, backend/tests/helpers/testDb.js)
+backend/data/*.db
+backend/data/**/*.db

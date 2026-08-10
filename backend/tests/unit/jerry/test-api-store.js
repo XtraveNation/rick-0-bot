@@ -6,15 +6,19 @@ const { getDatabase } = require('../../../jerry/db');
 
 describe('POST /api/jerry/store', () => {
   let db;
+  let testDbPath;
 
   beforeAll(async () => {
-    db = getDatabase();
-    // Use test database
+    // Use test database. JERRY_DB_PATH must be set before getDatabase() is
+    // first called anywhere in this process, since JerryDatabase reads it
+    // only at construction time and getDatabase() caches a singleton.
     const testDir = path.join(__dirname, '..', '..', '..', 'data', 'test');
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
-    process.env.JERRY_DB_PATH = path.join(testDir, `api-test-${Date.now()}.db`);
+    testDbPath = path.join(testDir, `api-test-${Date.now()}.db`);
+    process.env.JERRY_DB_PATH = testDbPath;
+    db = getDatabase();
   });
 
   beforeEach(async () => {
@@ -31,6 +35,9 @@ describe('POST /api/jerry/store', () => {
       await db.close();
     } catch (err) {
       // Already closed
+    }
+    if (testDbPath && fs.existsSync(testDbPath)) {
+      fs.unlinkSync(testDbPath);
     }
   });
 

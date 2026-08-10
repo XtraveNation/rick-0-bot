@@ -13,6 +13,7 @@ const { webhookLimiter, apiLimiter } = require('./rateLimiters');
 
 // Import services
 const { getDatabase } = require('./jerry/db');
+const tokensService = require('./jerry/tokens');
 const { extractEntities, formatExtractedEntities } = require('./jerry/entityExtractor');
 const QdrantClient = require('./summer/qdrantClient');
 const stripeHandler = require('./stripe/checkoutHandler');
@@ -29,7 +30,14 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 // Initialize services
-const db = getDatabase();
+// Note: getDatabase() is NOT called eagerly here. JerryDatabase reads
+// JERRY_DB_PATH from the environment only once, at construction time, and
+// getDatabase() caches a singleton after the first call. Calling it at
+// module-require time would bind the singleton to whatever JERRY_DB_PATH
+// happens to be set (or not) at require() time - which, in tests, is
+// always before test setup code gets a chance to point it at an isolated
+// db file. Route handlers below call getDatabase() individually so the
+// first real call happens at request time instead.
 const qdrant = new QdrantClient(
   process.env.QDRANT_URL || 'http://localhost:6333',
   process.env.EMBEDDING_PROVIDER || 'openai'
@@ -91,6 +99,8 @@ app.post('/api/jerry/store', authenticate, async (req, res) => {
   }
 
   try {
+    const db = getDatabase();
+
     // Store message
     const message = await db.storeMessage(
       session_id,
@@ -141,7 +151,7 @@ app.get('/api/jerry/history', authenticate, async (req, res) => {
   }
 
   try {
-    const messages = await db.getHistory(session_id, parseInt(limit, 10));
+    const messages = await getDatabase().getHistory(session_id, parseInt(limit, 10));
     const totalTokens = messages.reduce((sum, msg) => sum + (msg.tokens_used || 0), 0);
 
     res.json({
@@ -177,7 +187,7 @@ app.get('/api/jerry/entities', authenticate, async (req, res) => {
   }
 
   try {
-    const allEntities = await db.getEntities(session_id);
+    const allEntities = await getDatabase().getEntities(session_id);
     
     // Group entities by type
     const groupedEntities = {};
@@ -340,6 +350,7 @@ async function startServer() {
   try {
     // Initialize Jerry database
     logger.info('Initializing Jerry database...');
+    const db = getDatabase();
     await db.init();
     logger.info('Jerry database initialized');
 
@@ -366,7 +377,7 @@ async function startServer() {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM signal received: closing HTTP server');
   try {
-    await db.close();
+    await getDatabase().close();
     process.exit(0);
   } catch (error) {
     logger.error('Error during shutdown:', error);

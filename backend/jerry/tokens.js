@@ -1,7 +1,6 @@
 const { getDatabase } = require('./db');
 
-async function ensureTokensTable() {
-  const dbInst = getDatabase();
+async function ensureTokensTable(dbInst = getDatabase()) {
   // Ensure DB init
   await dbInst.init();
   const db = dbInst.db;
@@ -21,8 +20,7 @@ async function ensureTokensTable() {
   });
 }
 
-async function getBalance(sessionId) {
-  const dbInst = getDatabase();
+async function getBalance(sessionId, dbInst = getDatabase()) {
   await dbInst.init();
   const db = dbInst.db;
 
@@ -35,8 +33,7 @@ async function getBalance(sessionId) {
   });
 }
 
-async function addTokens(sessionId, amount) {
-  const dbInst = getDatabase();
+async function addTokens(sessionId, amount, dbInst = getDatabase()) {
   await dbInst.init();
   const db = dbInst.db;
 
@@ -47,13 +44,12 @@ async function addTokens(sessionId, amount) {
       ON CONFLICT(session_id) DO UPDATE SET balance = balance + excluded.balance, updated_at = CURRENT_TIMESTAMP;
     `, [sessionId, amount], function (err) {
       if (err) return reject(err);
-      getBalance(sessionId).then(resolve).catch(reject);
+      getBalance(sessionId, dbInst).then(resolve).catch(reject);
     });
   });
 }
 
-async function consumeTokens(sessionId, amount) {
-  const dbInst = getDatabase();
+async function consumeTokens(sessionId, amount, dbInst = getDatabase()) {
   await dbInst.init();
   const db = dbInst.db;
 
@@ -66,7 +62,7 @@ async function consumeTokens(sessionId, amount) {
 
         db.run(`UPDATE tokens SET balance = balance - ?, updated_at = CURRENT_TIMESTAMP WHERE session_id = ?`, [amount, sessionId], function (err2) {
           if (err2) return reject(err2);
-          getBalance(sessionId).then(newBal => resolve({ success: true, balance: newBal })).catch(reject);
+          getBalance(sessionId, dbInst).then(newBal => resolve({ success: true, balance: newBal })).catch(reject);
         });
       });
     });
