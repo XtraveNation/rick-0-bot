@@ -58,6 +58,14 @@ class JerryDatabase {
           if (err) reject(err);
         });
 
+        // Index to speed up SUM(tokens_used) GROUP BY session_id aggregation
+        // used by the tokens leaderboard/stats queries.
+        this.db.run(`
+          CREATE INDEX IF NOT EXISTS idx_messages_tokens_used ON messages(session_id, tokens_used)
+        `, (err) => {
+          if (err) reject(err);
+        });
+
         // Entities table
         this.db.run(`
           CREATE TABLE IF NOT EXISTS entities (
@@ -234,6 +242,70 @@ class JerryDatabase {
         } else {
           resolve({ id, session_id: sessionId, turn_range: turnRange, summary_text: summaryText });
         }
+      });
+    });
+  }
+
+  /**
+   * Get the top sessions ranked by total tokens consumed (aggregated from
+   * messages.tokens_used, the per-message usage already recorded when
+   * messages are stored). No separate tracking table is needed - this is
+   * a straight SUM/GROUP BY over existing data.
+   */
+  getTokenLeaderboard(limit = 10) {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare(`
+        SELECT session_id,
+               SUM(tokens_used) AS total_tokens,
+               COUNT(*) AS message_count
+        FROM messages
+        GROUP BY session_id
+        ORDER BY total_tokens DESC
+        LIMIT ?
+      `);
+
+      stmt.all(limit, (err, rows) => {
+        stmt.finalize();
+        if (err) {
+          reject(err);
+        } else {
+          resolve((rows || []).map(row => ({
+            session_id: row.session_id,
+            total_tokens: row.total_tokens || 0,
+            message_count: row.message_count || 0
+          })));
+        }
+      });
+    });
+  }
+
+  /**
+   * Get aggregate token usage stats across all sessions with recorded
+   * message activity.
+   */
+  getTokenStats() {
+    return new Promise((resolve, reject) => {
+      this.db.get(`
+        SELECT
+          COALESCE(SUM(tokens_used), 0) AS total_tokens,
+          COUNT(DISTINCT session_id) AS total_sessions
+        FROM messages
+      `, (err, row) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        const totalTokens = (row && row.total_tokens) || 0;
+        const totalSessions = (row && row.total_sessions) || 0;
+        const averageTokensPerSession = totalSessions > 0
+          ? totalTokens / totalSessions
+          : 0;
+
+        resolve({
+          total_tokens: totalTokens,
+          total_sessions: totalSessions,
+          average_tokens_per_session: averageTokensPerSession
+        });
       });
     });
   }

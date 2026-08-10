@@ -309,6 +309,43 @@ app.post('/api/tokens/consume', authenticate, async (req, res) => {
   }
 });
 
+// GET leaderboard - top sessions ranked by total tokens consumed, sourced
+// from messages.tokens_used (real per-message usage already recorded by
+// /api/jerry/store). Sessions are the only identity we have (no auth/user
+// system), so this ranks sessions, not users.
+app.get('/api/tokens/leaderboard', authenticate, async (req, res) => {
+  const { limit = 10, includeStats } = req.query;
+  let parsedLimit = parseInt(limit, 10);
+  if (Number.isNaN(parsedLimit) || parsedLimit <= 0) parsedLimit = 10;
+  if (parsedLimit > 100) parsedLimit = 100;
+
+  try {
+    const db = getDatabase();
+    const leaderboard = await db.getTokenLeaderboard(parsedLimit);
+    const response = { leaderboard };
+
+    if (includeStats === 'true' || includeStats === '1') {
+      response.stats = await db.getTokenStats();
+    }
+
+    res.json(response);
+  } catch (err) {
+    logger.error('Error retrieving token leaderboard:', err);
+    res.status(500).json({ error: 'Failed to retrieve leaderboard' });
+  }
+});
+
+// GET stats - aggregate token usage analytics across all sessions
+app.get('/api/tokens/stats', authenticate, async (req, res) => {
+  try {
+    const stats = await getDatabase().getTokenStats();
+    res.json(stats);
+  } catch (err) {
+    logger.error('Error retrieving token stats:', err);
+    res.status(500).json({ error: 'Failed to retrieve stats' });
+  }
+});
+
 // POST add tokens (admin or webhook)
 app.post('/api/tokens/add', authenticate, async (req, res) => {
   const { session_id, amount } = req.body;

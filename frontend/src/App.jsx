@@ -4,6 +4,7 @@ import RickTab from './RickTab';
 import MortyTab from './MortyTab';
 import SummerTab from './SummerTab';
 import JerryTab from './JerryTab';
+import LeaderboardTab from './LeaderboardTab';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
             <li><Link to="/morty">Morty</Link></li>
             <li><Link to="/summer">Summer</Link></li>
             <li><Link to="/jerry">Jerry</Link></li>
+            <li><Link to="/leaderboard">Leaderboard</Link></li>
           </ul>
         </nav>
         <Routes>
@@ -22,6 +24,7 @@ function App() {
           <Route path="/morty" element={<MortyTab />} />
           <Route path="/summer" element={<SummerTab />} />
           <Route path="/jerry" element={<JerryTab />} />
+          <Route path="/leaderboard" element={<LeaderboardTab />} />
         </Routes>
       </div>
     </Router>
